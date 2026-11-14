@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フラボノイドの pKa 解説</title>
+<meta name="description" content="フラボノイドのどの OH が先にプロトンを失うか、SPLET 機構との関係、MLIP 記述子と MD 平均で pKa を予測する研究計画の解説">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">研究テーマの解説</p>
+    <h1>フラボノイドの pKa を<br>MLIP 記述子と MD で予測する</h1>
+    <p class="lead">クエルセチンの 5 つの OH のうち、どれが最初にプロトンを失うのか。実験と計算で答えが割れているこの問題を、機械学習ポテンシャル（MLIP）の記述子と分子動力学（MD）で解き直す、という計画の背景を順に説明する。</p>
+    <nav class="toc" aria-label="目次">
+      <a href="#pka">1. pKa とは</a>
+      <a href="#micro">2. ミクロ pKa とマクロ pKa</a>
+      <a href="#quercetin">3. クエルセチンの論争</a>
+      <a href="#splet">4. SPLET と酸化還元</a>
+      <a href="#mlip">5. MLIP 記述子</a>
+      <a href="#md">6. なぜ MD で平均するか</a>
+      <a href="#plan">7. 研究計画</a>
+      <a href="#refs">参考文献</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="pka">
+  <h2><span class="num">1</span>pKa とは</h2>
+  <p>フェノールの OH（ArOH）は水中で一部がプロトン（H⁺）を手放し、フェノキシド（ArO⁻）になる。<strong>pKa は「ちょうど半分が ArO⁻ になる pH」</strong>である。pH が pKa より 1 高いと約 91% が、2 高いと約 99% が ArO⁻ になる（Henderson–Hasselbalch 式）。</p>
+  <div class="card interactive">
+    <div class="controls">
+      <label>pKa <output id="pkaVal">9.0</output><input id="pkaSlider" type="range" min="4" max="13" step="0.1" value="9.0"></label>
+      <label>溶液の pH <output id="phVal">7.4</output><input id="phSlider" type="range" min="2" max="14" step="0.1" value="7.4"></label>
+    </div>
+    <canvas id="hhCanvas" width="720" height="260" aria-label="pH と脱プロトン化率の曲線"></canvas>
+    <p class="readout" id="hhReadout"></p>
+  </div>
+  <p class="note">pKa が 1 ずれると、ある pH での ArO⁻ の量はおよそ 10 倍変わる。予測誤差 1 pKa 単位は小さくない。</p>
+</section>
+
+<section id="micro">
+  <h2><span class="num">2</span>ミクロ pKa とマクロ pKa</h2>
+  <p>OH が複数ある分子では、<strong>どの OH が抜けたか</strong>で別々の陰イオンができる。それぞれの OH に固有の値が<strong>ミクロ pKa</strong>（部位別 pKa）である。一方、滴定や UV で測れるのは「分子全体として 1 個目の H⁺ が抜ける pH」で、これを<strong>マクロ pKa</strong>という。</p>
+  <p>2 つの OH（A と B）が競合する場合、マクロ pKa₁ は次の式で決まる。</p>
+  <p class="formula">10<sup>−pKa₁(マクロ)</sup> = 10<sup>−pKa(A)</sup> + 10<sup>−pKa(B)</sup></p>
+  <div class="card interactive">
+    <div class="controls">
+      <label>OH-A（例: 7-OH）のミクロ pKa <output id="mAval">7.2</output><input id="mA" type="range" min="5" max="11" step="0.05" value="7.2"></label>
+      <label>OH-B（例: 4'-OH）のミクロ pKa <output id="mBval">7.5</output><input id="mB" type="range" min="5" max="11" step="0.05" value="7.5"></label>
+    </div>
+    <div class="bars">
+      <div class="barrow"><span>A から抜けた陰イオン</span><div class="bar"><div id="barA" class="fill a"></div></div><b id="pctA"></b></div>
+      <div class="barrow"><span>B から抜けた陰イオン</span><div class="bar"><div id="barB" class="fill b"></div></div><b id="pctB"></b></div>
+    </div>
+    <p class="readout" id="microReadout"></p>
+  </div>
+  <p class="note">ミクロ pKa の差が 0.5 以内だと、両方の陰イオンが同程度に共存する。この場合、実験の方法によって「どちらが先か」の結論が揺れやすい。この点が次の節の論争につながる。</p>
+</section>
+
+<section id="quercetin">
+  <h2><span class="num">3</span>クエルセチン：どの OH が最初に抜けるか</h2>
+  <p>クエルセチンは代表的なフラボノイド（植物由来の抗酸化物質）で、OH を 5 つ持つ（3, 5, 7, 3', 4' 位）。構造式の <span class="chip">OH</span> を押すと、その位置の説明が出る。</p>
+  <div class="card interactive">
+    <div class="seg" role="tablist">
+      <button class="segbtn active" data-view="none">位置だけ表示</button>
+      <button class="segbtn" data-view="exp">実験の帰属</button>
+      <button class="segbtn" data-view="calc">気相計算の予想</button>
+    </div>
+    <svg id="qSvg" viewBox="0 0 10 7" role="img" aria-label="クエルセチンの構造式"></svg>
+    <div id="qInfo" class="info">OH を選ぶと説明が出る。</div>
+  </div>
+  <h3>実験と計算の食い違い</h3>
+  <p>文献を見ると、<strong>実験</strong>（pH を変えた ¹³C NMR など）は <b>7-OH</b> が最初に抜けるとするものが多い。一方、<strong>気相</strong>のプロトン親和力を DFT で計算すると <b>4'-OH</b> が有利と出る [1]。報告されている pKa₁ の値にも幅があり、塩基性の条件で起きる酸化分解がばらつきの一因とされる。連続溶媒モデル（SMD）を使った DFT でも、4'-OH と 7-OH の差は 0.69 kcal/mol しかない [1]。</p>
+  <p>食い違いの原因として考えられるのは、次の 3 つである。</p>
+  <ol class="reasons">
+    <li><b>溶媒:</b> 気相計算には水がない。陰イオンの電荷が水和でどれだけ安定するかは位置によって違う。</li>
+    <li><b>分子内水素結合と立体配座:</b> 3'-OH と 4'-OH は隣り合っているので、片方が抜けるともう片方が水素結合で陰イオンを支える。OH の向き（回転異性体）によってこの効果が変わる。</li>
+    <li><b>ミクロ pKa が近い:</b> 前の節のとおり、値が近いと 2 種類の陰イオンが共存し、方法によって見え方が変わる。</li>
+  </ol>
+  <p class="note">2 と 3 が当てはまるなら、<strong>1 つの最適化構造だけを見る方法では足りず、配座の揺らぎと溶媒を入れた記述子</strong>が要る。これが本計画の出発点である。</p>
+</section>
+
+<section id="splet">
+  <h2><span class="num">4</span>SPLET：pKa が酸化還元の速さを決める</h2>
+  <p>フェノールはラジカル（R•）に水素を渡して無害化する。これが抗酸化作用で、<strong>酸化還元反応</strong>の一種である。経路は主に 2 つある。</p>
+  <div class="card interactive">
+    <div class="seg" role="tablist">
+      <button class="segbtn active" data-path="hat">HAT（水素原子移動）</button>
+      <button class="segbtn" data-path="splet">SPLET（逐次プロトン脱離電子移動）</button>
+    </div>
+    <div id="pathView" class="pathview"></div>
+    <div class="stepnav">
+      <button id="stepPrev" aria-label="前へ">◀</button>
+      <span id="stepLabel"></span>
+      <button id="stepNext" aria-label="次へ">▶</button>
+    </div>
+  </div>
+  <p>メタノールのような電離しやすい溶媒では SPLET が主になる。このとき反応の入口は「ArOH が H⁺ を手放すこと」なので、<strong>pKa が低い（酸性が強い）フェノールほど速く反応する</strong>。実験では、酢酸を加えて電離を抑えると反応が遅くなり、水を加えると速くなる [3, 4]。</p>
+  <div class="card interactive">
+    <p class="small">溶媒の条件を変えたときの傾向（定性的な模式図）</p>
+    <div class="seg" role="tablist">
+      <button class="segbtn" data-solv="acid">メタノール＋酢酸</button>
+      <button class="segbtn active" data-solv="meoh">メタノール</button>
+      <button class="segbtn" data-solv="water">メタノール＋水</button>
+    </div>
+    <div class="bars">
+      <div class="barrow"><span>ArO⁻（フェノキシド）の量</span><div class="bar"><div id="solvBar1" class="fill b"></div></div><b id="solvTxt1"></b></div>
+      <div class="barrow"><span>SPLET の寄与</span><div class="bar"><div id="solvBar2" class="fill a"></div></div><b id="solvTxt2"></b></div>
+    </div>
+    <p class="readout" id="solvReadout"></p>
+  </div>
+  <p class="note">つまり、<b>どの OH が先に抜けるか</b>は、どの OH がラジカルに電子を渡すかに直結する。pKa を部位ごとに正しく予測できれば、抗酸化反応の機構の議論にそのまま使える。</p>
+</section>
+
+<section id="mlip">
+  <h2><span class="num">5</span>MLIP 記述子とは</h2>
+  <p>MLIP（機械学習原子間ポテンシャル）は、DFT の結果を学習して、原子の配置からエネルギーと力を高速に出すモデルである（PFP [5]、UMA、eSEN、MACE-OFF など）。その内部では、<strong>各原子の周りの原子配置を、数百次元のベクトルに変換</strong>している。PFP なら 1 原子あたり 256 次元である。このベクトルが<strong>原子ごとの記述子</strong>で、電子状態に近い情報（その原子がどれだけ電子を引きつけやすいか、など）を含むと考えられる。</p>
+  <div class="card interactive">
+    <div class="controls">
+      <label>カットオフ半径 <output id="rcVal">6.0 Å</output><input id="rcSlider" type="range" min="2" max="8" step="0.5" value="6"></label>
+    </div>
+    <svg id="mSvg" viewBox="0 0 10 7" role="img" aria-label="選んだ原子のカットオフ球"></svg>
+    <p class="readout" id="mReadout">原子を押すと、その原子の記述子に影響する範囲が出る。</p>
+  </div>
+  <p>本計画では、この記述子をグラフニューラルネットワーク（EGNN）の各原子の入力に加え、「この OH の pKa はいくつか」を予測させる。元の QupKake [6] は半経験的量子化学計算（xTB）の値を入力にしている。それを MLIP の記述子に置き換えたり足したりして精度を比べる。</p>
+  <p class="note">2D 構造式上の模式図である（縮尺は結合長 ≈ 1.4 Å で換算）。実際は 3D の球になる。</p>
+</section>
+
+<section id="md">
+  <h2><span class="num">6</span>なぜ MD で平均するか</h2>
+  <p>記述子は原子の配置から計算されるので、<strong>OH の向きが変われば記述子も変わる</strong>。構造最適化では 1 つの配座しか得られない。しかし実際の分子は室温で揺れていて、3'-OH と 4'-OH の水素結合は付いたり外れたりしている。MD でたくさんの構造をとり、記述子を平均（必要なら分散も）すれば、こうした揺らぎを入力に含められる。</p>
+  <div class="card interactive">
+    <canvas id="mdCanvas" width="720" height="220" aria-label="MD 中の水素結合の有無の模式図"></canvas>
+    <div class="controls row">
+      <button id="mdPlay">▶ 最初から再生</button>
+      <span class="readout" id="mdReadout"></span>
+    </div>
+    <p class="small">模式図（実データではない）。上段: 3'-OH…4'-O の水素結合の有無。下段: それに連動する 4'-O の記述子の 1 成分のイメージ。破線が平均。</p>
+  </div>
+  <h3>MD を回すときの注意</h3>
+  <ul>
+    <li><b>気相の MD:</b> 水がないので、陰イオンや双性イオンを回すとプロトンが別の場所に移ることがある。中性分子に限るのが安全である。</li>
+    <li><b>水を露わに入れた MD:</b> 分子を水の箱に入れて回し、溶質の原子の記述子だけを取り出す。溶媒の効果を入れられるが、計算は重くなる。</li>
+    <li><b>電荷:</b> PFP は全電荷を入力できない。陰イオンを正しく扱うには、電荷を指定できる UMA などを使う必要がある。</li>
+  </ul>
+</section>
+
+<section id="plan">
+  <h2><span class="num">7</span>研究計画</h2>
+  <ol class="pipeline">
+    <li><b>構造をつくる</b><span>実験 pKa のデータ（学習用 5,637 分子、外部テスト用 122＋280 分子）を RDKit で 3D 化した（6,039 構造、すべて成功）。</span></li>
+    <li><b>Matlantis で最適化・記述子</b><span>PFP で構造最適化し、原子ごとの記述子を取り出す。大きい中性分子（重原子 25 以上、1,201 分子）は MD も回す。</span></li>
+    <li><b>他の MLIP でも同じことをする</b><span>UMA・eSEN・MACE-OFF の記述子を手元の GPU で計算する。</span></li>
+    <li><b>pKa を予測する</b><span>記述子なし / xTB / PFP / UMA / eSEN を、同じ EGNN で比べる。分子の大きさごとにも評価する。</span></li>
+    <li><b>難しいケースで確かめる</b><span>クエルセチンなどのフラボノイドで、どの OH が先に抜けるかと pKa を予測し、実験（NMR・UV の帰属、実測 pKa）と照らし合わせる。</span></li>
+  </ol>
+  <div class="grid2">
+    <div class="card"><h3>新規性になりうる点</h3><ul><li>MLIP の原子記述子を pKa に使うこと</li><li>MD（気相・水中）で平均した記述子を使うこと</li><li>実験と計算で割れているフラボノイドの帰属に、実験値で学習したモデルで答えること</li></ul></div>
+    <div class="card"><h3>まだわからないこと</h3><ul><li>文献調査（115 件）の範囲では、MLIP の記述子を小分子の pKa に使った例も、MD で平均した例も見つかっていない（タンパク質の残基 pKa ではある）</li><li>フラボノイド 9 種の全 OH の実測 pKa はある [7] が、部位の帰属はソフトウェアや DFT に頼った部分が多い</li><li>学習データにカテコール類が少ない（8 サイト）ことの影響</li></ul></div>
+  </div>
+</section>
+
+<section id="glossary">
+  <h2>用語</h2>
+  <dl class="gloss">
+    <dt>プロトン（H⁺）</dt><dd>水素の原子核。酸が手放すもの。</dd>
+    <dt>フェノキシド（ArO⁻）</dt><dd>フェノールの OH から H⁺ が抜けた陰イオン。</dd>
+    <dt>ラジカル（R•）</dt><dd>不対電子を持つ反応性の高い化学種。酸化ストレスの原因になる。</dd>
+    <dt>DFT</dt><dd>密度汎関数理論。電子状態を計算する標準的な量子化学の方法。</dd>
+    <dt>xTB</dt><dd>半経験的な量子化学計算。DFT より速いが粗い。元の QupKake が使っている。</dd>
+    <dt>MLIP</dt><dd>機械学習原子間ポテンシャル。DFT を学習した高速なモデル。</dd>
+    <dt>EGNN</dt><dd>回転・並進に対して性質が変わらないように作ったグラフニューラルネットワーク。</dd>
+    <dt>MD</dt><dd>分子動力学。原子にかかる力から運動を時間発展させ、揺らぎを再現する。</dd>
+  </dl>
+</section>
+
+<section id="refs">
+  <h2>参考文献</h2>
+  <p class="small">いずれも Crossref で書誌を確認済み（2026-11-14）。</p>
+  <ol class="refs">
+    <li>Li, Z. et al. The Flow of the Redox Energy in Quercetin during Its Antioxidant Activity in Water. <i>Int. J. Mol. Sci.</i> <b>2020</b>, 21, 6015. <a href="https://doi.org/10.3390/ijms21176015">doi:10.3390/ijms21176015</a></li>
+    <li>Biler, M. et al. Quercetin and its analogues: optical and acido–basic properties. <i>Phys. Chem. Chem. Phys.</i> <b>2017</b>, 19, 26870–26879. <a href="https://doi.org/10.1039/c7cp03845c">doi:10.1039/c7cp03845c</a></li>
+    <li>Litwinienko, G.; Ingold, K. U. Solvent Effects on the Rates and Mechanisms of Reaction of Phenols with Free Radicals. <i>Acc. Chem. Res.</i> <b>2007</b>, 40, 222–230. <a href="https://doi.org/10.1021/ar0682029">doi:10.1021/ar0682029</a></li>
+    <li>Przybylski, P. et al. Concentration-dependent HAT/ET mechanism of the reaction of phenols with 2,2-diphenyl-1-picrylhydrazyl (dpph˙). <i>RSC Adv.</i> <b>2022</b>, 12, 8131–8136. <a href="https://doi.org/10.1039/d2ra01033j">doi:10.1039/d2ra01033j</a></li>
+    <li>Takamoto, S. et al. Towards universal neural network potential for material discovery applicable to arbitrary combination of 45 elements. <i>Nat. Commun.</i> <b>2022</b>, 13, 2991. <a href="https://doi.org/10.1038/s41467-022-30687-9">doi:10.1038/s41467-022-30687-9</a></li>
+    <li>Abarbanel, O. D.; Hutchison, G. R. QupKake: Integrating Machine Learning and Quantum Chemistry for Micro-pKa Predictions. <i>J. Chem. Theory Comput.</i> <b>2024</b>, 20, 6946–6956. <a href="https://doi.org/10.1021/acs.jctc.4c00328">doi:10.1021/acs.jctc.4c00328</a></li>
+    <li>Fuguet, E. et al. Acidity constants of hydroxyl groups placed in several flavonoids: Two flavanones, two flavones and five flavonols. <i>Talanta</i> <b>2023</b>, 253, 124096. <a href="https://doi.org/10.1016/j.talanta.2022.124096">doi:10.1016/j.talanta.2022.124096</a></li>
+  </ol>
+</section>
+
+</main>
+<footer class="wrap foot">研究計画の説明用ページ。数値の入った図のうち「模式図」と書いたものは実データではない。</footer>
+<script src="js/quercetin-data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
