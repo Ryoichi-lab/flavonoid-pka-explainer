@@ -157,7 +157,94 @@
   }
   ['p1Slider', 'p2Slider', 'phSlider'].forEach((id) => $(id).addEventListener('input', drawPH));
 
-  function all() { drawRxn(); drawMD(); drawDG(); drawPH(); }
+
+  // ---------- 図 5: 計算の流れ ----------
+  const NS = 'http://www.w3.org/2000/svg';
+  // クエルセチンの骨格から OH を選んで描く。keep = {原子番号: 位置名}、hl = {位置名: 色}
+  const Q_OH = { 3: '3', 12: '5', 9: '7', 20: "3'", 18: "4'" };
+  function molSVG(keep, hl) {
+    const Q = window.QUERCETIN; if (!Q) return '';
+    const drop = new Set(Object.keys(Q_OH).map(Number).filter((i) => !(i in keep)));
+    const at = Q.atoms.filter((a) => !drop.has(a.i));
+    const xs = at.map((a) => a.x), ys = at.map((a) => a.y);
+    const minx = Math.min(...xs) - 1.4, maxx = Math.max(...xs) + 1.4, miny = Math.min(...ys) - 1.4, maxy = Math.max(...ys) + 1.4;
+    const ink = css('--ink'), o = css('--o'), surf = css('--surface'), mut = css('--muted');
+    const cx = xs.reduce((u, v) => u + v, 0) / xs.length, cy = ys.reduce((u, v) => u + v, 0) / ys.length;
+    let g = '';
+    Q.bonds.forEach((b) => {
+      if (drop.has(b.a) || drop.has(b.b)) return;
+      const A = Q.atoms[b.a], B = Q.atoms[b.b];
+      if (b.o === 2) {
+        const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy), nx = -dy / l * 0.08, ny = dx / l * 0.08;
+        g += `<line x1="${A.x + nx}" y1="${A.y + ny}" x2="${B.x + nx}" y2="${B.y + ny}" stroke="${ink}" stroke-width="0.07"/>`;
+        g += `<line x1="${A.x - nx}" y1="${A.y - ny}" x2="${B.x - nx}" y2="${B.y - ny}" stroke="${ink}" stroke-width="0.07"/>`;
+      } else g += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="${ink}" stroke-width="0.07"/>`;
+    });
+    at.forEach((a) => {
+      if (a.el === 'C') return;
+      const isOH = a.i in keep; const pos = keep[a.i]; const col = isOH ? (hl[pos] || css('--accent')) : null;
+      if (isOH) g += `<circle cx="${a.x}" cy="${a.y}" r="0.55" fill="none" stroke="${col}" stroke-width="0.12"/>`;
+      g += `<circle cx="${a.x}" cy="${a.y}" r="${isOH ? 0.38 : 0.26}" fill="${surf}"/>`;
+      g += `<text x="${a.x}" y="${a.y}" font-size="0.5" font-weight="700" fill="${o}" text-anchor="middle" dominant-baseline="central">${isOH ? 'OH' : 'O'}</text>`;
+      if (isOH) {
+        const vx = a.x - cx, vy = a.y - cy, vl = Math.hypot(vx, vy);
+        g += `<text x="${a.x + vx / vl * 0.95}" y="${a.y + vy / vl * 0.95}" font-size="0.42" font-weight="700" fill="${col}" text-anchor="middle" dominant-baseline="central">${pos}</text>`;
+      }
+    });
+    return `<svg viewBox="${minx} ${miny} ${maxx - minx} ${maxy - miny}" role="img">${g}</svg>`;
+  }
+  function phenolSVG() {
+    const ink = css('--ink'), o = css('--o'), acc = css('--accent'), surf = css('--surface');
+    let p = ''; const P = [];
+    for (let k = 0; k < 6; k++) { const t = -Math.PI / 2 + k * Math.PI / 3; P.push([Math.cos(t), Math.sin(t)]); }
+    let g = `<polygon points="${P.map((q) => q.join(',')).join(' ')}" fill="none" stroke="${ink}" stroke-width="0.07"/>`;
+    g += `<circle cx="0" cy="0" r="0.55" fill="none" stroke="${ink}" stroke-width="0.05"/>`;
+    g += `<line x1="0" y1="-1" x2="0" y2="-1.75" stroke="${ink}" stroke-width="0.07"/>`;
+    g += `<circle cx="0" cy="-2.15" r="0.55" fill="none" stroke="${acc}" stroke-width="0.12"/><circle cx="0" cy="-2.15" r="0.38" fill="${surf}"/>`;
+    g += `<text x="0" y="-2.15" font-size="0.5" font-weight="700" fill="${o}" text-anchor="middle" dominant-baseline="central">OH</text>`;
+    return `<svg viewBox="-2.6 -3.1 5.2 4.5" role="img" style="max-height:150px">${g}</svg>`;
+  }
+  // 実測 pKa の数直線。marks = [{v, lbl, col, up}]、band = {lo, hi, lbl}
+  function ruler(marks, band, note) {
+    const ink = css('--ink'), mut = css('--muted'), line = css('--line');
+    const W = 300, H = band ? 106 : 92, L = 16, R = W - 12, Y0 = 50, X = (v) => L + (v - 5) / 8 * (R - L);
+    let g = `<line x1="${L}" y1="${Y0}" x2="${R}" y2="${Y0}" stroke="${mut}" stroke-width="1.2"/>`;
+    for (let v = 5; v <= 13; v++) g += `<line x1="${X(v)}" y1="${Y0 - 3}" x2="${X(v)}" y2="${Y0 + 3}" stroke="${mut}"/><text x="${X(v)}" y="${Y0 + 15}" font-size="10" fill="${mut}" text-anchor="middle">${v}</text>`;
+    g += `<text x="${R}" y="${Y0 + 30}" font-size="10" fill="${mut}" text-anchor="end">pKa →（右ほど抜けにくい）</text>`;
+    if (band) g += `<rect x="${X(band.lo)}" y="${Y0 - 7}" width="${X(band.hi) - X(band.lo)}" height="14" fill="${line}" stroke="${mut}" stroke-dasharray="3 2"/><text x="${(X(band.lo) + X(band.hi)) / 2}" y="${Y0 + 46}" font-size="10" fill="${css('--o')}" text-anchor="middle">↑ ${band.lbl}</text>`;
+    marks.forEach((m) => {
+      const x = X(m.v), ty = m.up ? Y0 - 30 : Y0 - 14;
+      g += `<circle cx="${x}" cy="${Y0}" r="5.5" fill="${m.col}"/>`;
+      g += `<line x1="${x}" y1="${Y0 - 6}" x2="${x}" y2="${ty + 4}" stroke="${m.col}" stroke-width="1"/>`;
+      g += `<text x="${x}" y="${ty}" font-size="11" font-weight="700" fill="${m.col}" text-anchor="middle">${m.lbl}</text>`;
+    });
+    if (note) g += `<text x="${L}" y="12" font-size="10.5" fill="${ink}">${note}</text>`;
+    return `<svg class="flowruler" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+  }
+  function drawFlow() {
+    const box = $('flowBox'); if (!box) return;
+    const acc = css('--accent'), a = css('--a'), b = css('--b'), o = css('--o');
+    const c7 = a, c3 = b, c5 = css('--o');
+    const card = (cls, chip, title, mols, rul, checks) =>
+      `<div class="flowcard ${cls}"><div class="flowhead"><span class="stagechip">${chip}</span><b>${title}</b></div><div class="flowbody">${mols}<div>${rul}<ul class="flowcheck">${checks.map((t) => `<li>${t}</li>`).join('')}</ul></div></div></div>`;
+    const arrow = `<div class="flowarrow" aria-hidden="true"><span>⬇</span>うまくいけば次へ</div>`;
+    const s1 = card('now', '段階 1・実行中', 'フェノール',
+      `<div class="flowmols">${phenolSVG()}</div>`,
+      ruler([{ v: 10.0, lbl: '10.0', col: acc }], null, '実測 pKa'),
+      ['H⁺ が水と行き来するか', 'ΔG が約 13.6 kcal/mol になるか', 'UMA・eSEN・PFP の差']);
+    const s2 = card('wide', '段階 2', 'ヒドロキシフラボン 3 種',
+      `<div class="flowmols three"><div>${molSVG({ 9: '7' }, { 7: c7 })}<div class="molcap">7-OH</div></div><div>${molSVG({ 3: '3' }, { 3: c3 })}<div class="molcap">3-OH</div></div><div>${molSVG({ 12: '5' }, { 5: c5 })}<div class="molcap">5-OH</div></div></div>`,
+      ruler([{ v: 7.28, lbl: '7-OH', col: c7 }, { v: 8.68, lbl: '3-OH', col: c3, up: true }, { v: 11.75, lbl: '5-OH', col: c5 }],
+        { lo: 8.4, hi: 8.7, lbl: '記述子モデルの 5-OH 予測' }, '実測 pKa'),
+      ['7 < 3 < 5 の順番が出るか', '5-OH（C=O と水素結合）が高く出るか']);
+    const s3 = card('goal', '段階 3・本題', 'クエルセチン',
+      `<div class="flowmols">${molSVG({ 3: '3', 12: '5', 9: '7', 20: "3'", 18: "4'" }, { 7: a, "4'": b, 3: css('--muted'), 5: css('--muted'), "3'": css('--muted') })}</div>`,
+      ruler([{ v: 7.35, lbl: '最初の pKa 7.35', col: css('--ink') }], null, 'どの OH の値か？　実験 → 7-OH ／ DFT → 4\'-OH'),
+      [`<b style="color:${a}">7-OH</b> と <b style="color:${b}">4'-OH</b>、どちらが先に抜けるか`]);
+    box.innerHTML = s1 + arrow + s2 + arrow + s3;
+  }
+
+  function all() { drawRxn(); drawMD(); drawDG(); drawPH(); drawFlow(); }
   reset();
   if (location.search.includes('filled')) advance(25000);   // 表示確認用：図 2 を進めた状態で開く
   all();

@@ -87,28 +87,14 @@
 
 <section id="flow">
   <h2><span class="num">5</span>計算の進め方</h2>
-  <p>いきなりクエルセチンを計算せず、答えの分かっている簡単な分子から順に進める。各段階で確かめることを、表 1 と下の流れに示す。前の段階で方法が成り立たなければ、次へは進まずに設定を見直す。</p>
-  <ol class="pipeline">
-    <li><b>フェノール（実行中、2026-11-16 開始）</b><span>方法が成り立つかを確かめる。OH が 1 つで、実測の pKa が 10.0 とはっきりしている。H⁺ が水へ移って戻る、を何度も繰り返すか（自由エネルギーの曲線が収束するか）、谷の差 ΔG が約 13.6 kcal/mol に近いか、UMA・eSEN・PFP でどれだけ差が出るかを見る。</span></li>
-    <li><b>OH が 1 つのヒドロキシフラボン 3 種</b><span>7-OH（pKa 7.28）・3-OH（8.68）・5-OH（11.75）の順番と差が出るかを見る。特に 5-OH は C=O と分子内水素結合をつくり、記述子を使った pKa モデルでは低すぎる値（8.4〜8.7）が出ていた部位である。水を露わに入れた MD でこれが直るかが、この方法の価値を確かめる最初の試金石になる。</span></li>
-    <li><b>クエルセチン（本題）</b><span>5 つの OH について ΔG を出し、7-OH と 4'-OH のどちらが先に抜けるかを決める。実験（¹³C NMR）は 7-OH、連続溶媒の DFT は 4'-OH を支持していて、食い違いの原因は 7-O⁻ と水の水素結合の扱いだと解釈されている。水分子を露わに扱う MD は、この点に直接答えられる。</span></li>
-  </ol>
-  <div class="tablewrap">
-  <table class="tbl">
-    <caption>表 1　各段階の分子と、確かめること</caption>
-    <thead><tr><th>段階</th><th>分子</th><th>実測 pKa</th><th>確かめること</th></tr></thead>
-    <tbody>
-      <tr><th>1</th><td>フェノール</td><td>10.0</td><td>曲線の収束、絶対値、MLIP ごとの差</td></tr>
-      <tr><th>2</th><td>7-、3-、5-ヒドロキシフラボン</td><td>7.28 / 8.68 / 11.75</td><td>部位の順番と差、5-OH の水素結合の効果</td></tr>
-      <tr><th>3</th><td>クエルセチン</td><td>第一部位 7-OH（¹³C NMR）</td><td>5 つの OH の順番、7-OH と 4'-OH の差</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="small">ヒドロキシフラボンの値は Dávila ら（J. Chem. Eng. Data 2013）の要旨からの抜粋で、本文での確認がまだ済んでいない。</p>
+  <p>図 5 のように、答えの分かっている簡単な分子から順に進める。前の段階がうまくいったら次へ進む。</p>
+  <div class="flow" id="flowBox" aria-label="計算の 3 段階"></div>
+  <p class="small">図 5　計算の 3 段階。丸で囲んだ OH が計算する部位。数直線は実測 pKa（左ほど H⁺ が抜けやすい）。ヒドロキシフラボンの値は Dávila ら（2013）の要旨からの抜粋で、本文は未確認。</p>
 </section>
 
 </main>
 <footer class="wrap foot">図 2〜4 の地形は説明用の模式図で、計算結果ではない。計算結果が出たら、このページに追加する。</footer>
+<script src="js/quercetin-data.js"></script>
 <script src="js/metad.js"></script>
 </body>
 </html>
