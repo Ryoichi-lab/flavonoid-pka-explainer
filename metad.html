@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>水中の脱プロトン化</title>
+<meta name="description" content="水の中で OH の H+ が抜ける自由エネルギーをメタダイナミクスで測り、pKa と pH ごとの陰イオンの割合に換算する流れを図で説明する">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">研究テーマの解説（続き）</p>
+    <h1>水の中で H⁺ が抜ける様子を<br>MLIP の MD で測る</h1>
+    <p class="lead">OH の H⁺ が水へ移るときの自由エネルギーをメタダイナミクスで測り、pKa に換算し、さらに pH ごとの陰イオンの割合に直す。その流れを図で順に説明する。</p>
+    <nav class="toc" aria-label="目次">
+      <a href="#what">1. 何を計算するか</a>
+      <a href="#metad">2. メタダイナミクス</a>
+      <a href="#pka">3. 自由エネルギー → pKa</a>
+      <a href="#ph">4. pKa → pH ごとの割合</a>
+      <a href="index.html">← 解説のトップへ</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+
+<section id="what">
+  <h2><span class="num">1</span>何を計算するか</h2>
+  <p>図 1 に示すように、フェノール（ArOH）を水分子の箱に入れ、OH の H⁺ だけが近くの水分子へ移る反応を考える。抜けるのは OH 全体ではなく H⁺ だけなので、残った分子は −1 価の ArO⁻ になり、H⁺ を受け取った水は H₃O⁺ になる。箱全体の電荷は 0 のままである。</p>
+  <div class="card">
+    <svg id="rxnSvg" viewBox="0 0 720 210" role="img" aria-label="ArOH と水が ArO- と H3O+ になる反応の模式図"></svg>
+    <p class="small">図 1　水の中での脱プロトン化の模式図。左が ArOH（谷 A）、右が ArO⁻＋H₃O⁺（谷 B）。</p>
+  </div>
+  <p>この反応を見張る量（集団変数 s）として、「O に付いている H の数」を使う。H がついていれば s ≈ 0.9、水へ渡せば s ≈ 0.2 になる（水の H が水素結合で少し寄るので 0 にはならない）。</p>
+</section>
+
+<section id="metad">
+  <h2><span class="num">2</span>メタダイナミクス：谷を埋めて地形を測る</h2>
+  <p>普通の MD では、系は深い谷 A（ArOH）の中で揺れるだけで、山を越えて谷 B へはまず行かない。メタダイナミクスでは、系がいる場所に小さな山（ガウス関数）を少しずつ積む。図 2 の再生ボタンを押すと、谷が埋まって系が両方の谷を行き来しはじめ、積んだ山を裏返した形（破線）が元の地形（実線）に近づいていく様子が見られる。</p>
+  <div class="card interactive">
+    <canvas id="mdCv" width="720" height="300" aria-label="メタダイナミクスで谷が埋まっていく模式図"></canvas>
+    <div class="controls row">
+      <button id="mdGo">▶ 再生</button>
+      <button id="mdReset">↺ 最初から</button>
+      <span class="readout" id="mdInfo"></span>
+    </div>
+    <p class="small">図 2　模式図（実データではない。見やすくするため、谷の差を小さくしてある）。実線：本当の自由エネルギー F(s)。塗り：F に積んだ山を足した形（系が感じる地形）。破線：積んだ山から推定した F。丸：今の系の位置。</p>
+  </div>
+  <ul>
+    <li>山は、同じ場所にいるほど高く積み上がる。だから系は、一度いた場所から押し出されていく。</li>
+    <li>積むたびに山を少しずつ低くする改良版（well-tempered）を使う。こうすると、推定した地形が行き過ぎずに収束する。</li>
+    <li>実際の計算では、この動きを 373 原子（フェノール＋水 120 個）の MD で、100 ps かけて行う。</li>
+  </ul>
+</section>
+
+<section id="pka">
+  <h2><span class="num">3</span>自由エネルギーの差を pKa に換算する</h2>
+  <p>得られた地形の 2 つの谷の高さの差 ΔG が、H⁺ の抜けにくさである。室温（298 K）では pKa = ΔG ÷ 1.364 kcal/mol で換算できる。図 3 のスライダーで ΔG を動かすと、pKa が変わる。</p>
+  <div class="card interactive">
+    <div class="controls">
+      <label>谷の差 ΔG <output id="dgVal"></output><input id="dgSlider" type="range" min="5" max="18" step="0.1" value="13.6"></label>
+    </div>
+    <canvas id="dgCv" width="720" height="220" aria-label="2 つの谷の高さの差と pKa"></canvas>
+    <p class="readout info" id="dgInfo"></p>
+    <p class="small">図 3　谷の差と pKa の関係（地形は模式図）。フェノールの実測 pKa 10.0 は ΔG ≈ 13.6 kcal/mol に当たる。</p>
+  </div>
+  <h3>実際は「差」で比べる</h3>
+  <p>箱の中の H₃O⁺ は 1 個だけなので、その濃度（約 0.45 mol/L）を基準の 1 mol/L に換算する補正が要る。MLIP ごとの系統的なずれも残る。そこで、同じ条件で 2 つの OH の ΔG を出し、差をとる。ΔpKa = (ΔG₁ − ΔG₂) ÷ 1.364 とすれば、補正とずれは差し引きでほぼ消える。クエルセチンなら、7-OH と 4'-OH の ΔG の差が、どちらが先に抜けるかの答えになる。</p>
+</section>
+
+<section id="ph">
+  <h2><span class="num">4</span>pKa から、pH ごとの陰イオンの割合を出す</h2>
+  <p>シミュレーションの中で pH を決めるわけではない。pKa が分かれば、ある pH で ArO⁻ になっている割合は 1 / (1 + 10^(pKa − pH)) で決まる。図 4 では、例として 2 つの OH（pKa を動かせる）の割合を pH に対して描いた。縦線を動かすと、その pH でどちらの陰イオンが多いかが分かる。</p>
+  <div class="card interactive">
+    <div class="controls">
+      <label>OH ① の pKa <output id="p1Val"></output><input id="p1Slider" type="range" min="4" max="13" step="0.1" value="7.3"></label>
+      <label>OH ② の pKa <output id="p2Val"></output><input id="p2Slider" type="range" min="4" max="13" step="0.1" value="8.0"></label>
+      <label>pH <output id="phVal"></output><input id="phSlider" type="range" min="2" max="14" step="0.1" value="7.4"></label>
+    </div>
+    <canvas id="phCv" width="720" height="260" aria-label="pH と陰イオンの割合"></canvas>
+    <p class="readout info" id="phInfo"></p>
+    <p class="small">図 4　pH と ArO⁻ の割合（各 OH を独立に扱った簡略図）。pH = pKa のとき、ちょうど半分が ArO⁻ になる。</p>
+  </div>
+  <p>SPLET では、まず ArO⁻ ができ、そこから電子が移る。生理的な pH 7.4 でどの OH の陰イオンが多いかが分かれば、どの OH から反応が進むかまで議論できる。これが、OH ごとの pKa を水の中で計算する理由である。</p>
+</section>
+
+</main>
+<footer class="wrap foot">図 2〜4 の地形は説明用の模式図で、計算結果ではない。計算結果が出たら、このページに追加する。</footer>
+<script src="js/metad.js"></script>
+</body>
+</html>
